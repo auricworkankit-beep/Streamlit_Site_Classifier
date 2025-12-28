@@ -12,15 +12,12 @@ from src.mgrs.mgrs_zone_band import (
     get_mgrs_zone_band_limits
 )
 
-# --------------------------------------------------
 # Page config
-# --------------------------------------------------
 st.set_page_config(layout="wide")
 st.markdown("**Site Detections**")
 
-# --------------------------------------------------
+
 # Paths
-# --------------------------------------------------
 JSON_PATH = "site_classifications.json"
 
 TC_GEOJSON_FILES = {
@@ -39,9 +36,8 @@ TC_COLORS = {
     "Central TC": "#d62728",
 }
 
-# --------------------------------------------------
+
 # Cached loaders
-# --------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load_geojson(path: str) -> dict:
     with open(path, "r") as f:
@@ -75,14 +71,42 @@ def load_sites_dataframe(json_path: str) -> pd.DataFrame:
 def get_mgrs_layer_cached():
     return build_mgrs_zone_band_layer()
 
-# --------------------------------------------------
+
+#Unified TC Boundary in Default TC view, but upon TC selection, we break the internal boundaries into provinces
+from shapely.geometry import shape, mapping
+from shapely.ops import unary_union
+
+@st.cache_data(show_spinner=False)
+def dissolve_geojson(geojson: dict) -> dict:
+    """
+    Dissolve all features in a GeoJSON into a single polygon feature.
+    """
+    geoms = [shape(f["geometry"]) for f in geojson["features"]]
+    dissolved = unary_union(geoms)
+
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": mapping(dissolved),
+                "properties": {}
+            }
+        ]
+    }
+
+INDIA_BOUNDS_PATH = "/workspaces/Streamlit_Site_Classifier/data/india_international_bounds.geojson"
+
+@st.cache_data(show_spinner=False)
+def load_india_bounds():
+    with open(INDIA_BOUNDS_PATH, "r") as f:
+        return json.load(f)
+
 # Load data
-# --------------------------------------------------
 df = load_sites_dataframe(JSON_PATH)
 
-# --------------------------------------------------
+
 # Sidebar controls
-# --------------------------------------------------
 st.sidebar.header("Filters")
 
 site_types = sorted(df["predicted_label"].unique())
@@ -109,10 +133,9 @@ if view_mode == "Theater Command View":
 
 filtered_df = df[df["predicted_label"].isin(selected_site_type)]
 
-# --------------------------------------------------
+
 # Map setup
-# --------------------------------------------------
-DEFAULT_VIEW = {"lat": 35.0, "lon": 78.0, "zoom": 4}
+DEFAULT_VIEW = {"lat": 35.0, "lon": 85.0, "zoom": 4}
 
 folium_map = folium.Map(
     location=[DEFAULT_VIEW["lat"], DEFAULT_VIEW["lon"]],
@@ -134,18 +157,31 @@ if view_mode == "Theater Command View":
     tc_layer = folium.FeatureGroup("Theater Commands", overlay=False)
 
     for tc_name, tc_path in TC_GEOJSON_FILES.items():
+
+        # Skip non-selected TCs when a specific one is chosen
         if selected_tc not in (None, "All") and tc_name != selected_tc:
             continue
 
+        raw_geojson = load_geojson(tc_path)
+
+        # 🔑 Core logic:
+        # - Default ("All") → dissolve → no internal boundaries
+        # - Specific TC → original geometry → internal boundaries visible
+        if selected_tc in (None, "All"):
+            geojson_to_render = dissolve_geojson(raw_geojson)
+            border_weight = 2
+        else:
+            geojson_to_render = raw_geojson
+            border_weight = 1
+
         color = TC_COLORS.get(tc_name, "#ff0000")
-        geojson = load_geojson(tc_path)
 
         folium.GeoJson(
-            geojson,
-            style_function=lambda f, c=color: {
+            geojson_to_render,
+            style_function=lambda f, c=color, w=border_weight: {
                 "fillColor": c,
                 "color": c,
-                "weight": 1,
+                "weight": w,
                 "fillOpacity": 0.5,
             },
             highlight_function=lambda f, c=color: {
@@ -195,16 +231,32 @@ for _, row in filtered_df.iterrows():
         )
     ).add_to(folium_map)
 
-# --------------------------------------------------
+
+
+# India occlusion layer (ALWAYS ON)
+india_geojson = load_india_bounds()
+
+folium.GeoJson(
+    india_geojson,
+    name="India Occlusion Mask",
+    style_function=lambda f: {
+        "fillColor": "#000000",
+        "color": "#000000",
+        "weight": 0,
+        "fillOpacity": 1.0,   # fully opaque
+    },
+    interactive=False  # does NOT block pan/zoom/clicks
+).add_to(folium_map)
+
+
+
 # Render map (centered)
-# --------------------------------------------------
 left, center, right = st.columns([1, 6, 1])
 with center:
     map_state = st_folium(folium_map, width=1200, height=620)
 
-# --------------------------------------------------
+
 # Table
-# --------------------------------------------------
 st.subheader("Detected Sites")
 st.dataframe(
     filtered_df[
