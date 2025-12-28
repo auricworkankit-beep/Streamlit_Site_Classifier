@@ -145,9 +145,28 @@ def load_india_bounds():
     with open(INDIA_BOUNDS_PATH, "r") as f:
         return json.load(f)
 
+from shapely.geometry import Point, shape
+from shapely.ops import unary_union
+
+@st.cache_data(show_spinner=False)
+def build_tc_geometry_map(tc_files: dict) -> dict:
+    """
+    Returns { TC_NAME: shapely_geometry } for fast point-in-polygon checks
+    """
+    tc_geom_map = {}
+
+    for tc_name, tc_path in tc_files.items():
+        with open(tc_path, "r") as f:
+            geojson = json.load(f)
+
+        geoms = [shape(feat["geometry"]) for feat in geojson["features"]]
+        tc_geom_map[tc_name] = unary_union(geoms)
+
+    return tc_geom_map
+
 # Load data
 df = load_sites_dataframe(JSON_PATH)
-
+TC_GEOMS = build_tc_geometry_map(TC_GEOJSON_FILES)
 
 # Sidebar controls
 st.sidebar.header("Filters")
@@ -165,17 +184,35 @@ view_mode = st.sidebar.radio(
 )
 
 selected_tc = None
-show_mgrs = False
 
+# Theater Command selector (only when relevant)
 if view_mode == "Theater Command View":
     selected_tc = st.sidebar.selectbox(
         "Select Theater Command",
         ["All"] + list(TC_GEOJSON_FILES.keys())
     )
-    show_mgrs = st.sidebar.checkbox("Show MGRS Grid", value=False)
 
+# MGRS toggle (ALWAYS visible)
+show_mgrs = st.sidebar.checkbox(
+    "Show MGRS Grid",
+    value=False
+)
+
+# Attribute filter (Site Type) 
 filtered_df = df[df["predicted_label"].isin(selected_site_type)]
+# Spatial filter (Theater Command)
+if (
+    view_mode == "Theater Command View"
+    and selected_tc not in (None, "All")
+):
+    tc_geom = TC_GEOMS[selected_tc]
 
+    filtered_df = filtered_df[
+        filtered_df.apply(
+            lambda r: tc_geom.contains(Point(r["lon"], r["lat"])),
+            axis=1
+        )
+    ]
 
 # Map setup
 folium_map = create_base_map()
