@@ -1,0 +1,21 @@
+# Core app
+streamlit>=1.31,<2.0
+
+# Data handling
+pandas>=1.5,<3.0
+numpy>=1.23,<2.0
+
+# Mapping / GIS
+folium>=0.14
+streamlit-folium>=0.18
+geopandas>=0.13
+shapely>=2.0
+pyproj>=3.5
+fiona>=1.9
+
+# MGRS conversion
+mgrs>=1.4
+
+# File formats
+openpyxl>=3.1   # for .xlsx (site sizes)
+lxml>=4.9       # KML/KMZ support via Fiona/GDAL
