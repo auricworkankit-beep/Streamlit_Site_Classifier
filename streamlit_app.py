@@ -12,6 +12,49 @@ from src.mgrs.mgrs_zone_band import (
     get_mgrs_zone_band_limits
 )
 
+# SINGLE AUTHORITY: BASE MAP VIEW CONTROLLER
+def create_base_map():
+    """
+    This function is the ONLY place that controls:
+    - Default map view
+    - Zoom limits
+    - Pan limits
+    """
+
+    # FIXED VIEW BOX (make changes the default view here in future when expanding the area of interest from China to Pakistan and so, current centered on the Indian subcontinent)
+    VIEW_BOUNDS = [
+        [5.0, 55.0],     # South-West  (lat, lon)
+        [62.0, 135.0],   # North-East
+    ]
+
+    DEFAULT_ZOOM = 4
+
+    m = folium.Map(
+        location=[30.0, 85.0],   # temporary, overridden by fit_bounds
+        zoom_start=DEFAULT_ZOOM,
+        tiles=None,
+        zoom_control=True,
+        max_bounds=True,
+    )
+
+    # Base tiles
+    folium.TileLayer(
+        tiles="CartoDB dark_matter",
+        no_wrap=True,
+        continuous_world=False
+    ).add_to(m)
+
+    # LOCK DEFAULT VIEW
+    m.fit_bounds(VIEW_BOUNDS, padding=(20, 20))
+
+
+    m.options["maxBounds"] = VIEW_BOUNDS
+    m.options["maxBoundsViscosity"] = 1.0   # hard lock at default zoom
+    m.options["minZoom"] = DEFAULT_ZOOM     # cannot zoom out
+    m.options["worldCopyJump"] = False
+
+    return m
+
 # Page config
 st.set_page_config(layout="wide")
 st.markdown("**Site Detections**")
@@ -118,7 +161,7 @@ selected_site_type = st.sidebar.multiselect(
 
 view_mode = st.sidebar.radio(
     "View Mode",
-    ["Grid View", "Theater Command View"]
+    ["Base View", "Theater Command View"]
 )
 
 selected_tc = None
@@ -135,24 +178,10 @@ filtered_df = df[df["predicted_label"].isin(selected_site_type)]
 
 
 # Map setup
-DEFAULT_VIEW = {"lat": 35.0, "lon": 85.0, "zoom": 4}
+folium_map = create_base_map()
 
-folium_map = folium.Map(
-    location=[DEFAULT_VIEW["lat"], DEFAULT_VIEW["lon"]],
-    zoom_start=DEFAULT_VIEW["zoom"],
-    tiles=None,
-    zoom_control=True
-)
 
-folium.TileLayer(
-    tiles="CartoDB dark_matter",
-    no_wrap=True,
-    continuous_world=False
-).add_to(folium_map)
-
-# --------------------------------------------------
-# Theater Command baselayer
-# --------------------------------------------------
+# Theater Command baselayer (For China as of now)
 if view_mode == "Theater Command View":
     tc_layer = folium.FeatureGroup("Theater Commands", overlay=False)
 
@@ -164,7 +193,7 @@ if view_mode == "Theater Command View":
 
         raw_geojson = load_geojson(tc_path)
 
-        # 🔑 Core logic:
+        # Core logic:
         # - Default ("All") → dissolve → no internal boundaries
         # - Specific TC → original geometry → internal boundaries visible
         if selected_tc in (None, "All"):
@@ -194,14 +223,10 @@ if view_mode == "Theater Command View":
 
     tc_layer.add_to(folium_map)
 
-# --------------------------------------------------
+
 # MGRS overlay (toggleable)
-# --------------------------------------------------
 if view_mode == "Theater Command View" and show_mgrs:
     mgrs_bounds = get_mgrs_zone_band_limits()
-    folium_map.options["maxBounds"] = mgrs_bounds
-    folium_map.options["maxBoundsViscosity"] = 1.0
-    folium_map.options["minZoom"] = 2
 
     folium.GeoJson(
         get_mgrs_layer_cached(),
@@ -214,9 +239,8 @@ if view_mode == "Theater Command View" and show_mgrs:
         tooltip=folium.GeoJsonTooltip(fields=["mgrs"], aliases=["MGRS"])
     ).add_to(folium_map)
 
-# --------------------------------------------------
+
 # Site markers (always visible)
-# --------------------------------------------------
 for _, row in filtered_df.iterrows():
     folium.CircleMarker(
         location=[row["lat"], row["lon"]],
