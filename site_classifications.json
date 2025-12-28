@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "description": "Site-level classification results aggregated by MGRS grid",
+    "generated_by": "Site_Classifier",
+    "grid_system": "MGRS",
+    "level": "site",
+    "version": "1.0",
+    "num_sites": 10
+  },
+  "sites": [
+    {
+      "image_name": "0",
+      "target_grid": "45TWJ3830346144",
+      "mgrs_zone": "45",
+      "mgrs_zone_band": "45T",
+      "true_label": "SAM_Site",
+      "predicted_label": "SAM_Site",
+      "confidence": 0.9669,
+      "outcome": "TP"
+    },
+    {
+      "image_name": "3",
+      "target_grid": "50RQQ7163990912",
+      "mgrs_zone": "50",
+      "mgrs_zone_band": "50R",
+      "true_label": "SSM_Base",
+      "predicted_label": "SSM_Base",
+      "confidence": 0.9864,
+      "outcome": "TP"
+    },
+    {
+      "image_name": "6",
+      "target_grid": "45TWJ3830346144",
+      "mgrs_zone": "45",
+      "mgrs_zone_band": "45T",
+      "true_label": "SAM_Site",
+      "predicted_label": "SAM_Site",
+      "confidence": 0.9728,
+      "outcome": "TP"
+    },
+    {
+      "image_name": "8",
+      "target_grid": "45TWJ3830346144",
+      "mgrs_zone": "45",
+      "mgrs_zone_band": "45T",
+      "true_label": "SAM_Site",
+      "predicted_label": "SAM_Site",
+      "confidence": 0.694,
+      "outcome": "TP"
+    },
+    {
+      "image_name": "10",
+      "target_grid": "48RUU5619543754",
+      "mgrs_zone": "48",
+      "mgrs_zone_band": "48R",
+      "true_label": "SAM_Site",
+      "predicted_label": "SAM_Site",
+      "confidence": 0.9857,
+      "outcome": "TP"
+    },
+    {
+      "image_name": "327",
+      "target_grid": "45SWD9972216466",
+      "mgrs_zone": "45",
+      "mgrs_zone_band": "45S",
+      "true_label": "SSM_Base",
+      "predicted_label": "SSM_Base",
+      "confidence": 0.9317,
+      "outcome": "TP"
+    },
+    {
+      "image_name": "329",
+      "target_grid": "50RNP3144582595",
+      "mgrs_zone": "50",
+      "mgrs_zone_band": "50R",
+      "true_label": "SSM_Base",
+      "predicted_label": "SSM_Base",
+      "confidence": 0.9992,
+      "outcome": "TP"
+    },
+    {
+      "image_name": "331",
+      "target_grid": "45SWD9972216466",
+      "mgrs_zone": "45",
+      "mgrs_zone_band": "45S",
+      "true_label": "SSM_Base",
+      "predicted_label": "SSM_Base",
+      "confidence": 0.9826,
+      "outcome": "TP"
+    },
+    {
+      "image_name": "333",
+      "target_grid": "46SFG7667499753",
+      "mgrs_zone": "46",
+      "mgrs_zone_band": "46S",
+      "true_label": "SSM_Base",
+      "predicted_label": "TNG",
+      "confidence": 0.9537,
+      "outcome": "FN"
+    },
+    {
+      "image_name": "335",
+      "target_grid": "46SFG7667499753",
+      "mgrs_zone": "46",
+      "mgrs_zone_band": "46S",
+      "true_label": "SSM_Base",
+      "predicted_label": "TNG",
+      "confidence": 0.8555,
+      "outcome": "FN"
+    }
+  ]
+}
