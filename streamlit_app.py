@@ -7,7 +7,7 @@ import geopandas as gpd
 from shapely.geometry import Polygon
 from streamlit_folium import st_folium
 import json
-from lxml import etree
+import xml.etree.ElementTree as etree
 
 from src.mgrs.mgrs_zone_band import (
     build_mgrs_zone_band_layer,
@@ -170,7 +170,7 @@ def build_tc_geometry_map(tc_files: dict) -> dict:
 @st.cache_resource(show_spinner=False)
 def load_unified_site_polygons(kmz_path: str):
     import zipfile
-    from lxml import etree
+    import xml.etree.ElementTree as etree
     from shapely.geometry import shape
     from shapely.ops import unary_union
 
