@@ -7,6 +7,7 @@ import geopandas as gpd
 from shapely.geometry import Polygon
 from streamlit_folium import st_folium
 import json
+from lxml import etree
 
 from src.mgrs.mgrs_zone_band import (
     build_mgrs_zone_band_layer,
@@ -21,7 +22,6 @@ def create_base_map():
     - Zoom limits
     - Pan limits
     """
-
     # FIXED VIEW BOX (make changes the default view here in future when expanding the area of interest from China to Pakistan and so, current centered on the Indian subcontinent)
     VIEW_BOUNDS = [
         [5.0, 55.0],     # South-West  (lat, lon)
@@ -167,9 +167,60 @@ def build_tc_geometry_map(tc_files: dict) -> dict:
 
     return tc_geom_map
 
+@st.cache_resource(show_spinner=False)
+def load_unified_site_polygons(kmz_path: str):
+    import zipfile
+    from lxml import etree
+    from shapely.geometry import shape
+    from shapely.ops import unary_union
+
+    with zipfile.ZipFile(kmz_path) as z:
+        kml_name = [n for n in z.namelist() if n.endswith(".kml")][0]
+        kml_data = z.read(kml_name)
+
+    root = etree.fromstring(kml_data)
+    ns = {"kml": "http://www.opengis.net/kml/2.2"}
+
+    site_polys = {}
+
+    for pm in root.findall(".//kml:Placemark", namespaces=ns):
+        name = pm.find("kml:name", namespaces=ns)
+        if name is None:
+            continue
+
+        full_name = name.text.strip()
+        mgrs = full_name.split("_")[0]   # 🔑 KEY FACT
+
+        polygon = pm.find("kml:Polygon", namespaces=ns)
+        if polygon is None:
+            continue
+
+        coords_text = polygon.find(
+            ".//kml:coordinates", namespaces=ns
+        ).text.strip()
+
+        coords = []
+        for c in coords_text.split():
+            lon, lat, *_ = map(float, c.split(","))
+            coords.append((lon, lat))
+
+        site_polys[mgrs] = {
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [coords]
+            },
+            "name": full_name
+        }
+
+    return site_polys
+
 # Load data
 df = load_sites_dataframe(JSON_PATH)
 TC_GEOMS = build_tc_geometry_map(TC_GEOJSON_FILES)
+
+SITE_POLY_PATH = "data/Unified_Site_Poly.kmz"
+SITE_POLYGONS = load_unified_site_polygons(SITE_POLY_PATH)
+
 
 # Sidebar controls
 st.sidebar.header("Filters")
@@ -220,6 +271,25 @@ if (
 # Map setup
 folium_map = create_base_map()
 
+# View normalization / Theater Command zoom control
+if (
+    view_mode == "Theater Command View"
+    and selected_tc not in (None, "All")
+):
+    tc_geom = TC_GEOMS[selected_tc]
+    minx, miny, maxx, maxy = tc_geom.bounds
+
+    # 🔓 TEMPORARILY RELAX GLOBAL VIEW LOCK
+    folium_map.options["maxBounds"] = None
+    folium_map.options["maxBoundsViscosity"] = 0.0
+
+    folium_map.fit_bounds(
+        [[miny, minx], [maxy, maxx]],
+        padding=(0, 0)
+    )
+
+    # Allow deeper zoom while focused
+    folium_map.options["minZoom"] = 5
 
 # Theater Command baselayer (For China as of now)
 if view_mode == "Theater Command View":
@@ -282,18 +352,27 @@ if view_mode == "Theater Command View" and show_mgrs:
 
 # Site markers (always visible)
 for _, row in filtered_df.iterrows():
-    folium.CircleMarker(
-        location=[row["lat"], row["lon"]],
-        radius=5,
-        color="cyan",
-        fill=True,
-        fill_opacity=0.9,
-        popup=(
-            f"<b>Grid:</b> {row['zone_band']}<br>"
+    mgrs = row["target_grid"]
+
+    site = SITE_POLYGONS.get(mgrs)
+    if site is None:
+        continue
+
+    folium.GeoJson(
+        site["geometry"],
+        style_function=lambda _: {
+            "fillColor": "#00ffff",
+            "color": "#00ffff",
+            "weight": 1,
+            "fillOpacity": 0.6,
+        },
+        tooltip=(
+            f"<b>MGRS:</b> {mgrs}<br>"
             f"<b>Predicted:</b> {row['predicted_label']}<br>"
             f"<b>Confidence:</b> {row['confidence']:.2f}"
         )
     ).add_to(folium_map)
+
 
 
 # India occlusion layer (ALWAYS ON)
@@ -316,7 +395,7 @@ folium.GeoJson(
 # Render map (centered)
 left, center, right = st.columns([1, 6, 1])
 with center:
-    st_folium(folium_map, width=1200, height=620)
+    st_folium(folium_map, width=1200, height=720)
 
 
 # Table
