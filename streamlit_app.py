@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import mgrs
 import folium
+from pathlib import Path
 import geopandas as gpd
 from shapely.geometry import Polygon
 from streamlit_folium import st_folium
@@ -64,11 +65,11 @@ st.markdown("**Site Detections**")
 JSON_PATH = "site_classifications.json"
 
 TC_GEOJSON_FILES = {
-    "North TC": "/workspaces/Streamlit_Site_Classifier/data/china_pla_ground_forces_north_TC.geojson",
-    "East TC":  "/workspaces/Streamlit_Site_Classifier/data/china_pla_ground_forces_east_TC.geojson",
-    "South TC": "/workspaces/Streamlit_Site_Classifier/data/china_pla_ground_forces_south_TC.geojson",
-    "West TC":  "/workspaces/Streamlit_Site_Classifier/data/china_pla_ground_forces_west_TC.geojson",
-    "Central TC": "/workspaces/Streamlit_Site_Classifier/data/china_pla_ground_forces_center_TC.geojson",
+    "North TC": "data/china_pla_ground_forces_north_TC.geojson",
+    "East TC":  "data/china_pla_ground_forces_east_TC.geojson",
+    "South TC": "data/china_pla_ground_forces_south_TC.geojson",
+    "West TC":  "data/china_pla_ground_forces_west_TC.geojson",
+    "Central TC": "data/china_pla_ground_forces_center_TC.geojson",
 }
 
 TC_COLORS = {
@@ -83,9 +84,9 @@ TC_COLORS = {
 # Cached loaders
 @st.cache_data(show_spinner=False)
 def load_geojson(path: str) -> dict:
-    with open(path, "r") as f:
+    path = Path(path)
+    with path.open("r", encoding="utf-8") as f:
         return json.load(f)
-
 
 @st.cache_data(show_spinner=False)
 def load_sites_dataframe(json_path: str) -> pd.DataFrame:
@@ -138,7 +139,7 @@ def dissolve_geojson(geojson: dict) -> dict:
         ]
     }
 
-INDIA_BOUNDS_PATH = "/workspaces/Streamlit_Site_Classifier/data/india_international_bounds.geojson"
+INDIA_BOUNDS_PATH = "data/india_international_bounds.geojson"
 
 @st.cache_data(show_spinner=False)
 def load_india_bounds():
@@ -150,13 +151,15 @@ from shapely.ops import unary_union
 
 @st.cache_data(show_spinner=False)
 def build_tc_geometry_map(tc_files: dict) -> dict:
-    """
-    Returns { TC_NAME: shapely_geometry } for fast point-in-polygon checks
-    """
     tc_geom_map = {}
 
     for tc_name, tc_path in tc_files.items():
-        with open(tc_path, "r") as f:
+        tc_path = Path(tc_path)
+
+        if not tc_path.exists():
+            raise FileNotFoundError(f"Missing TC file: {tc_path}")
+
+        with tc_path.open("r", encoding="utf-8") as f:
             geojson = json.load(f)
 
         geoms = [shape(feat["geometry"]) for feat in geojson["features"]]
@@ -293,7 +296,6 @@ for _, row in filtered_df.iterrows():
     ).add_to(folium_map)
 
 
-
 # India occlusion layer (ALWAYS ON)
 india_geojson = load_india_bounds()
 
@@ -314,7 +316,7 @@ folium.GeoJson(
 # Render map (centered)
 left, center, right = st.columns([1, 6, 1])
 with center:
-    map_state = st_folium(folium_map, width=1200, height=620)
+    st_folium(folium_map, width=1200, height=620)
 
 
 # Table
@@ -330,5 +332,5 @@ st.dataframe(
             "outcome"
         ]
     ],
-    use_container_width=True
+    width="stretch"
 )
